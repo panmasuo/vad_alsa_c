@@ -1,9 +1,7 @@
-#include <complex.h>
-
-#include "def.h"
-
 #ifndef VAD_MOATT_H_
 #define VAD_MOATT_H_
+
+#include <complex.h>
 
 typedef double complex cplx;
 

@@ -1,9 +1,10 @@
 /* FFT calculation file */
 /* Source: https://rosettacode.org/wiki/Fast_Fourier_transform#C */
 #include <math.h>
+
 #include "fft.h"
 
-void _fft(cplx buf[], cplx out[], int n, int step) 
+void _fft(cplx buf[], cplx out[], int n, int step)
 {
 	if (step < n) {
 		_fft(out, buf, n, step * 2);
@@ -17,7 +18,7 @@ void _fft(cplx buf[], cplx out[], int n, int step)
 	}
 }
 
-void fft(cplx buf[], int n) 
+void fft(cplx buf[], int n)
 {
 	cplx out[n];
 	for (int i = 0; i < n; i++) {
@@ -33,7 +34,7 @@ void show(const char * s, cplx buf[], int frames)
 	for (int i = 0; i < frames; i++) {
 		if (!cimag(buf[i])) {
 			printf("%g ", creal(buf[i]));
-		} 
+		}
 		else {
 			printf("(%g, %g) ", creal(buf[i]), cimag(buf[i]));
 		}

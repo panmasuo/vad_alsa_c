@@ -1,72 +1,81 @@
+#include <pthread.h>		// -lpthread
+#include <semaphore.h>
 #include <signal.h>
-#include "def.h"
+
 #include "pcm_capture.h"
 #include "vad_moatt.h"
 
 #define MAX_SEM_COUNT 1
+
+#define SUCCESS 0
+#define FAILURE 1
 
 /* rtos global variables */
 pthread_t pcm_sampling_hndl;
 pthread_t vad_hndl;
 
 /* function prototypes */
-void sig_handler(int signum);
-int  init_mutexes();
+// void sig_handler(int signum);
+// int init_mutexes();
 
 /* signal handler for ^C: closing all files, windows, mutexes, etc. */
-void sig_handler(int signum) 
+// void sig_handler(int signum)
+// {
+//     if (signum != SIGINT) {
+// 		printf("Invalid signum %d\n", signum);
+// 	}
+
+//     pthread_cancel(pcm_sampling_hndl);
+//     pthread_cancel(vad_hndl);
+
+//     pthread_mutex_destroy(&mx_sync1);
+//     pthread_mutex_destroy(&signal_buffer_lock);
+
+//     sem_destroy(&sx_vadLock1);
+//     sem_destroy(&sx_vadLock2);
+
+//     printf("\nBye\n");
+//     exit(0);
+// }
+
+// int init_mutexes()
+// {
+//     pthread_mutexattr_t signal_buffer_lock_attr;
+
+//     sem_init(&sx_vadLock1, MAX_SEM_COUNT, 0);
+//     sem_init(&sx_vadLock2, MAX_SEM_COUNT, 1);
+
+//     if (pthread_mutex_init(&signal_buffer_lock, &signal_buffer_lock_attr) != 0) {
+//         printf("Mutex init failed!\n");
+//         return FAILURE;
+//     }
+
+//     if (pthread_mutex_init(&mx_sync1, NULL) != 0) {
+//         printf("Mutex init failed!\n");
+//         return FAILURE;
+//     }
+
+//     return SUCCESS;
+// }
+
+int main()
 {
-    if (signum != SIGINT) {
-		printf("Invalid signum %d\n", signum);
-	}
+    // signal(SIGINT, sig_handler);
 
-    pthread_cancel(pcm_sampling_hndl);
-    pthread_cancel(vad_hndl);
+    // printf("Initializing semaphores and mutexes\r\n");
+    // if (init_mutexes() == FAILURE) {
+    //     printf("Initialization failed\r\n");
+    //     // todo: go to exit sequence
+    //     return 0;
+    // }
 
-    pthread_mutex_destroy(&mx_sync1);
-    pthread_mutex_destroy(&signal_buffer_lock);
+    struct args {
+        sem_t lock1;
+        sem_t lock2;
+    } vad_locks;  // sx_vadLock1, sx_vadLock2;
 
-    sem_destroy(&sx_vadLock1);
-    sem_destroy(&sx_vadLock2);
-
-    printf("\nBye\n");
-    exit(0);
-}
-
-int init_mutexes()
-{
-    printf("co?");
-    pthread_mutexattr_t signal_buffer_lock_attr;
-
-    sem_init(&sx_vadLock1, MAX_SEM_COUNT, 0);
-    sem_init(&sx_vadLock2, MAX_SEM_COUNT, 1);
-
-    if (pthread_mutex_init(&signal_buffer_lock, &signal_buffer_lock_attr) != 0) {
-        printf("Mutex init failed!\n");
-        return FAILURE;
-    }
-
-    if (pthread_mutex_init(&mx_sync1, NULL) != 0) {
-        printf("Mutex init failed!\n");
-        return FAILURE;
-    }
-
-    return SUCCESS;
-}
-
-int main() {
-    signal(SIGINT, sig_handler);
-    
-    printf("Initializing semaphores and mutexes\r\n");
-    if (init_mutexes() == FAILURE) {
-        printf("Initialization failed\r\n");
-        // todo: go to exit sequence
-        return 0;
-    }
-
-    printf("Threads starting\n");
-    pthread_create(&pcm_sampling_hndl, NULL, &pcm_sampling_thrd, NULL);
-    pthread_create(&vad_hndl, NULL, &vad_moatt_thrd, NULL);
+    // pthread_create(&pcm_sampling_hndl, NULL, &pcm_sampling_thrd, NULL);
+    pthread_create(&vad_hndl, NULL, &vad_moatt_thrd, (void *)&vad_locks);
 
     while (1);
 

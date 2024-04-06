@@ -1,5 +1,5 @@
-obj/*.o
-files/
-run
 .vscode/
-
+CMakeFiles/
+obj/
+cmake_install.cmake
+CMakeCache.txt

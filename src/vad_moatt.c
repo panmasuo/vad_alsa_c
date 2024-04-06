@@ -1,13 +1,21 @@
 /* VAD algorithm file */
-#include "def.h"
+#include <pthread.h>		// -lpthread
+#include <semaphore.h>
+
 #include "vad_moatt.h"
 
 #define SPEECH_RUN_MIN_FRAMES   5
 #define SILENCE_RUN_MIN_FRAMES  10
 #define TRUE 1
 #define FALSE 0
+#define SAMPLING_RATE   44100
 
-extern short *real_buffer; // global variable for acquired pcm signal
+#define FRAME_SIZE      0.01         // ms
+#define FFT_POINTS      256
+#define FFT_STEP        (SAMPLING_RATE/FFT_POINTS)
+#define NUM_OF_FRAMES   (FRAME_SIZE*SAMPLING_RATE) * 10000
+
+// extern short *real_buffer; // global variable for acquired pcm signal
 
 typedef enum vad_decision {
     DECISION_SILENCE = 0,
@@ -37,14 +45,14 @@ static void set_minimum_feature(features_t *minimum, features_t *current, int i)
 static int calculate_counter(features_t *minimum, features_t *current, features_t *threshold);
 static void calculate_decision(vad_t *state, int counter);
 static void initialize_primary_thresholds(features_t *primary);
-static void initialize_current_thresholds(features_t *current, features_t *primary)
+static void initialize_current_thresholds(features_t *current, features_t *primary);
 
 /* static functions declarations */
 static void calculate_fft(cplx *fft_signal)
 {
     int i;
     for (i = 0; i < FFT_POINTS; i++) {
-        fft_signal[i] = (real_buffer[i] + 0.0f * _Complex_I);
+        // fft_signal[i] = (real_buffer[i] + 0.0f * _Complex_I);
     }
 
     fft(fft_signal, FFT_POINTS);
@@ -189,9 +197,15 @@ static void initialize_current_thresholds(features_t *current, features_t *prima
     current->SFM = primary->SFM;
 }
 
-void *vad_moatt_thrd()
+void *vad_moatt_thrd(void *args)
 {
-    // int i;
+    struct args {
+        sem_t lock1;
+        sem_t lock2;
+    };  // sx_vadLock1, sx_vadLock2;
+
+    struct args *vad_locks = args;
+
     int counter;
 
     vad_t state;
@@ -199,10 +213,10 @@ void *vad_moatt_thrd()
     features_t curFeat;
     features_t primThresh;
     features_t currThresh;
-
     short *real_signal;
-    real_signal = (short *)malloc(sizeof(short) * FFT_POINTS);
     cplx *fft_signal;
+
+    real_signal = (short *)malloc(sizeof(short) * FFT_POINTS);
     fft_signal = (cplx *)malloc(sizeof(cplx) * FFT_POINTS);
 
     /* based on Moatt */
@@ -213,15 +227,15 @@ void *vad_moatt_thrd()
 
     while (1) {
         for (int i = 0; i < NUM_OF_FRAMES; i++) {
-            sem_wait(&sx_vadLock1);
+            sem_wait(&vad_locks->lock1);
             printf("halo\r\n");
-            pthread_mutex_lock(&signal_buffer_lock);
-            memcpy(real_signal, real_buffer, sizeof(short) * FFT_POINTS);
-            pthread_mutex_unlock(&signal_buffer_lock);
+            // pthread_mutex_lock(&signal_buffer_lock);
+            // memcpy(real_signal, real_buffer, sizeof(short) * FFT_POINTS);
+            // pthread_mutex_unlock(&signal_buffer_lock);
 
             /* 3-1, 3-2 calculate features */
             calculate_fft(fft_signal);
-            curFeat.energy = calculate_energy(real_buffer);
+            // curFeat.energy = calculate_energy(real_buffer);
             curFeat.F = calculate_dominant(fft_signal);
             curFeat.SFM = calculate_sfm(fft_signal);
 
@@ -242,7 +256,7 @@ void *vad_moatt_thrd()
                 minFeat.energy = ((state.silence_run * minFeat.energy) + curFeat.energy) / (state.silence_run + 1);
             }
             currThresh.energy = primThresh.energy * log10f(minFeat.energy);
-            sem_post(&sx_vadLock2);
+            sem_post(&vad_locks->lock2);
         }
     }
     return 0;
