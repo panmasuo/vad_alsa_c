@@ -1,7 +1,8 @@
 #include <pthread.h>		// -lpthread
-#include <semaphore.h>
+
 #include <signal.h>
 
+#include "config.h"
 #include "pcm_capture.h"
 #include "vad_moatt.h"
 
@@ -16,7 +17,7 @@ pthread_t vad_hndl;
 
 /* function prototypes */
 // void sig_handler(int signum);
-// int init_mutexes();
+int init_mutexes(struct application_attributes* attrs);
 
 /* signal handler for ^C: closing all files, windows, mutexes, etc. */
 // void sig_handler(int signum)
@@ -38,44 +39,42 @@ pthread_t vad_hndl;
 //     exit(0);
 // }
 
-// int init_mutexes()
-// {
-//     pthread_mutexattr_t signal_buffer_lock_attr;
+int init_mutexes(struct application_attributes* attrs)
+{
+    pthread_mutexattr_t signal_buffer_lock_attr;
 
-//     sem_init(&sx_vadLock1, MAX_SEM_COUNT, 0);
-//     sem_init(&sx_vadLock2, MAX_SEM_COUNT, 1);
+    sem_init(&attrs->raw_buffer_ready, MAX_SEM_COUNT, 0);
+    sem_init(&attrs->raw_buffer_copied, MAX_SEM_COUNT, 1);
 
-//     if (pthread_mutex_init(&signal_buffer_lock, &signal_buffer_lock_attr) != 0) {
-//         printf("Mutex init failed!\n");
-//         return FAILURE;
-//     }
+    // if (pthread_mutex_init(&signal_buffer_lock, &signal_buffer_lock_attr) != 0) {
+    //     printf("Mutex init failed!\n");
+    //     return FAILURE;
+    // }
 
-//     if (pthread_mutex_init(&mx_sync1, NULL) != 0) {
-//         printf("Mutex init failed!\n");
-//         return FAILURE;
-//     }
+    // if (pthread_mutex_init(&mx_sync1, NULL) != 0) {
+    //     printf("Mutex init failed!\n");
+    //     return FAILURE;
+    // }
 
-//     return SUCCESS;
-// }
+    return SUCCESS;
+}
 
 int main()
 {
     // signal(SIGINT, sig_handler);
 
-    // printf("Initializing semaphores and mutexes\r\n");
-    // if (init_mutexes() == FAILURE) {
-    //     printf("Initialization failed\r\n");
-    //     // todo: go to exit sequence
-    //     return 0;
-    // }
+    struct application_attributes attrs;
 
-    struct args {
-        sem_t lock1;
-        sem_t lock2;
-    } vad_locks;  // sx_vadLock1, sx_vadLock2;
+    printf("Initializing semaphores and mutexes\r\n");
+    if (init_mutexes(&attrs) == FAILURE) {
+        printf("Initialization failed\r\n");
+        // todo: go to exit sequence
+        return 0;
+    }
 
-    // pthread_create(&pcm_sampling_hndl, NULL, &pcm_sampling_thrd, NULL);
-    pthread_create(&vad_hndl, NULL, &vad_moatt_thrd, (void *)&vad_locks);
+    // TODO does it need to be casted to void?
+    pthread_create(&pcm_sampling_hndl, NULL, &pcm_sampling_thrd, (void *)&attrs);
+    pthread_create(&vad_hndl, NULL, &vad_moatt_thrd, (void *)&attrs);
 
     while (1);
 
