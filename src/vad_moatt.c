@@ -1,7 +1,7 @@
 /* VAD algorithm file */
 #include <stdio.h>
 #include <string.h>
-#include <pthread.h>		// -lpthread
+#include <pthread.h>
 #include <semaphore.h>
 
 #include <math.h>
@@ -12,47 +12,64 @@
 
 #define SPEECH_RUN_MIN_FRAMES   5
 #define SILENCE_RUN_MIN_FRAMES  10
-#define TRUE 1
-#define FALSE 0
 
 #define FRAME_SIZE      0.01         // ms
 #define FFT_POINTS      NUMBER_OF_SAMPLES
 #define FFT_STEP        (SAMPLING_RATE/FFT_POINTS)
 #define NUM_OF_FRAMES   (FRAME_SIZE*SAMPLING_RATE) * 10000
 
-
-typedef enum vad_decision {
+typedef enum {
     DECISION_SILENCE = 0,
-    DECISION_SPEECH = 1,
-    DECISION_UNDEFINED = 255 // find better name
-} vad_decision_t;
+    DECISION_SPEECH = 1
+} vad_decision;
 
 /* local variables */
 typedef struct {
     long double energy;
     short F;
     float SFM;
-} features_t;
+} features;
 
 typedef struct {
-    unsigned char speech_run;
-    unsigned char silence_run;
-    unsigned char decision;
-} vad_t;
+    int speech_run;
+    int silence_run;
+    int decision;
+} vad;
 
-/* static functions prototypes */
+static void initialize_primary_thresholds(features *primary);
+static void initialize_current_thresholds(features *current, features *primary);
+
+/**
+ * @brief Calculate fast fourier transform for given signal.
+ *
+ * @param real_buffer buffer to calculate transform on.
+ * @param fft_signal returned fft signal.
+ */
 static void calculate_fft(short *real_buffer, cplx *fft_signal);
+
 static float calculate_energy(short *signal);
 static float calculate_dominant(cplx *spectrum);
 static float calculate_sfm(cplx *spectrum);
-static void set_minimum_feature(features_t *minimum, features_t *current, int i);
-static int calculate_counter(features_t *minimum, features_t *current, features_t *threshold);
-static void calculate_decision(vad_t *state, int counter);
-static void initialize_primary_thresholds(features_t *primary);
-static void initialize_current_thresholds(features_t *current, features_t *primary);
 
-/* static functions declarations */
-static void calculate_fft(short *real_buffer, cplx *fft_signal)
+static void set_minimum_feature(features *minimum, features *current, int i);
+static int calculate_counter(features *minimum, features *current, features *threshold);
+static int calculate_decision(vad *state, int counter);
+
+void initialize_primary_thresholds(features *primary)
+{
+    primary->energy = 40;
+    primary->F = 185;
+    primary->SFM = 5;
+}
+
+void initialize_current_thresholds(features *current, features *primary)
+{
+    current->energy = primary->energy;
+    current->F = primary->F;
+    current->SFM = primary->SFM;
+}
+
+void calculate_fft(short *real_buffer, cplx *fft_signal)
 {
     for (int i = 0; i < FFT_POINTS; i++) {
         fft_signal[i] = (real_buffer[i] + 0.0f * _Complex_I);
@@ -61,14 +78,58 @@ static void calculate_fft(short *real_buffer, cplx *fft_signal)
     fft(fft_signal, FFT_POINTS);
 }
 
-static float calculate_sfm(cplx *spectrum)
+float calculate_energy(short *signal)
 {
-    int i;
+    long double sum = 0;
+
+    for (int i = 0; i < FFT_POINTS; i++) {
+        sum += powl(signal[i], 2);
+    }
+
+    return sqrtl(sum / FFT_POINTS);
+}
+
+float calculate_dominant(cplx *spectrum)
+{
+    int i_real, i_imag;
+    float real, imag;
+    float max_real, max_imag;
+
+    for (int i = 0; i < FFT_POINTS / 2; i++) {
+        real = crealf(spectrum[i]);
+        imag = cimagf(spectrum[i]);
+
+        // set first values to max
+        if (i == 0) {
+            max_real = real;
+            max_imag = imag;
+            i_real = i;
+            i_imag = i;
+
+            continue;
+        }
+
+        if (real > max_real) {
+            max_real = real;
+            i_real = i;
+        }
+
+        if (imag > max_imag) {
+            max_imag = imag;
+            i_imag = i;
+        }
+    }
+
+    return max_real >= max_imag ? i_real * FFT_STEP : i_imag * FFT_STEP;
+}
+
+float calculate_sfm(cplx *spectrum)
+{
     float sum_ari = 0;
     float sum_geo = 0;
-    float abs_signal;
+    float abs_signal = 0;
 
-    for (i = 0; i < FFT_POINTS; i++) {
+    for (int i = 0; i < FFT_POINTS; i++) {
         abs_signal = cabsf(spectrum[i]);
         sum_ari += abs_signal;
         sum_geo += logf(abs_signal);
@@ -81,57 +142,7 @@ static float calculate_sfm(cplx *spectrum)
     return -10 * log10f(sum_geo / sum_ari);
 }
 
-static float calculate_dominant(cplx *spectrum)
-{
-    int i;
-    int i_real, i_imag;
-    float real, imag;
-    float max_real, max_imag;
-
-    for (i = 0; i < FFT_POINTS / 2; i++) {
-        real = crealf(spectrum[i]);
-        imag = cimagf(spectrum[i]);
-
-        if (i == 0) {
-            max_real = real;
-            max_imag = imag;
-            i_real = i;
-            i_imag = i;
-        }
-        else {
-            if (real > max_real) {
-                max_real = real;
-                i_real = i;
-            }
-
-            if (imag > max_imag) {
-                max_imag = imag;
-                i_imag = i;
-            }
-        }
-    }
-
-    if (max_real > max_imag) {
-        return i_real * FFT_STEP;
-    } else {
-        return i_imag * FFT_STEP;
-    }
-}
-
-float calculate_energy(short *signal)
-{
-    int i;
-    long double sum;
-
-    sum = 0;
-    for (i = 0; i < FFT_POINTS; i++) {
-        sum += powl(signal[i], 2);
-    }
-
-    return sqrtl(sum / FFT_POINTS);
-}
-
-static void set_minimum_feature(features_t *minimum, features_t *current, int i)
+void set_minimum_feature(features *minimum, features *current, int i)
 {
     if (i == 0) {
         minimum->energy = current->energy;
@@ -145,7 +156,7 @@ static void set_minimum_feature(features_t *minimum, features_t *current, int i)
     }
 }
 
-static int calculate_counter(features_t *minimum, features_t *current, features_t *threshold)
+int calculate_counter(features *minimum, features *current, features *threshold)
 {
     int counter = 0;
 
@@ -164,10 +175,10 @@ static int calculate_counter(features_t *minimum, features_t *current, features_
     return counter;
 }
 
-static void calculate_decision(vad_t *state, int counter)
+int calculate_decision(vad *state, int counter)
 {
     /* 3-6: mark the current frame as speech else mark it as silence */
-    if (counter > 1) {
+    if (counter >= 2) {
         state->speech_run++;
         state->silence_run = 0;
     }
@@ -176,28 +187,18 @@ static void calculate_decision(vad_t *state, int counter)
         state->speech_run = 0;
     }
 
-    /* 4-0 ignore silence run if less than 10 frames*/
+    /* 4-0 ignore silence run if less than 10 frames */
     if (state->silence_run > SILENCE_RUN_MIN_FRAMES) {
-        state->decision = FALSE;
+        return DECISION_SILENCE;
     }
 
     /* 5-0 ignore speech run if less than 5 frames */
     if (state->speech_run > SPEECH_RUN_MIN_FRAMES)  {
-        state->decision = TRUE;
+        return DECISION_SPEECH;
     }
-}
 
-static void initialize_primary_thresholds(features_t *primary)
-{
-    primary->energy = 40;
-    primary->F = 185;
-    primary->SFM = 5;
-}
-
-static void initialize_current_thresholds(features_t *current, features_t *primary)
-{
-    current->F = primary->F;
-    current->SFM = primary->SFM;
+    /* return current state in case silence/speech run is not detected */
+    return state->decision;
 }
 
 void *vad_moatt_thrd(void *args)
@@ -206,56 +207,53 @@ void *vad_moatt_thrd(void *args)
 
     int counter;
 
-    vad_t state;
-    features_t minFeat;
-    features_t curFeat;
-    features_t primThresh;
-    features_t currThresh;
+    vad state;
+    features minimum;
+    features current;
+    features primary_threshold;
+    features current_threshold;
 
     short real_signal[FFT_POINTS];
     cplx fft_signal[FFT_POINTS];
 
     /* based on Moatt */
-    initialize_primary_thresholds(&primThresh);
+    initialize_primary_thresholds(&primary_threshold);
 
     /* initial VAD decision */
-    initialize_current_thresholds(&currThresh, &primThresh); // moved from 3-4 for opt
+    initialize_current_thresholds(&current_threshold, &primary_threshold); // moved from 3-4 for opt
 
-    while (1) {
+    printf("[VAD] starting thread loop");
+    while (true) {
         for (int i = 0; i < NUM_OF_FRAMES; i++) {
-            printf("%f\r\n", currThresh.energy);
             sem_wait(&attrs->raw_buffer_ready);
-            // pthread_mutex_lock(&signal_buffer_lock);
-
             // TODO is is safe? is it fast enough? maybe move/swap/anything
             memcpy(real_signal, attrs->raw_samples, sizeof(short) * FFT_POINTS);
-            // pthread_mutex_unlock(&signal_buffer_lock);
             sem_post(&attrs->raw_buffer_copied);
 
-            /* 3-1, 3-2 calculate features */
             calculate_fft(real_signal, fft_signal);
-            // curFeat.energy = calculate_energy(real_buffer);
-            curFeat.F = calculate_dominant(fft_signal);
-            curFeat.SFM = calculate_sfm(fft_signal);
+
+            /* 3-1, 3-2 calculate features */
+            current.energy = calculate_energy(real_buffer);
+            current.F = calculate_dominant(fft_signal);
+            current.SFM = calculate_sfm(fft_signal);
 
             /* 3-3 calculate minimum value for first 30 frames */
-            set_minimum_feature(&minFeat, &curFeat, i);
+            set_minimum_feature(&minimum, &current, i);
 
             /* 3-4 set thresholds, only energy threashold is changing */
-            currThresh.energy = primThresh.energy * log10f(minFeat.energy);
+            current_threshold.energy = primary_threshold.energy * log10f(minimum.energy);
 
             /* 3-5 calculate counter */
-            counter = calculate_counter(&curFeat, &minFeat, &currThresh);
+            counter = calculate_counter(&current, &minimum, &current_threshold);
 
             /* 3-6, 4-0, 5-0: VAD */
-            calculate_decision(&state, counter);
+            state.decision = calculate_decision(counter);
 
             /* 3-7, 3-8: update minimum energy */
             if (state.decision == DECISION_SILENCE) {
-                minFeat.energy = ((state.silence_run * minFeat.energy) + curFeat.energy) / (state.silence_run + 1);
+                minimum.energy = ((state.silence_run * minimum.energy) + current.energy) / (state.silence_run + 1);
             }
-            currThresh.energy = primThresh.energy * log10f(minFeat.energy);
+            current_threshold.energy = primary_threshold.energy * log10f(minimum.energy);
         }
     }
-    return 0;
 }

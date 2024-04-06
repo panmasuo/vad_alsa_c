@@ -11,7 +11,11 @@ struct application_attributes {
     short raw_samples[NUMBER_OF_SAMPLES];
     sem_t raw_buffer_ready;
     sem_t raw_buffer_copied;
+};
 
+enum {
+    STATUS_SUCCESS,
+    STATUS_FAILURE
 };
 
 #endif
