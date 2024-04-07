@@ -10,13 +10,14 @@
 #include "fft.h"
 #include "vad_moatt.h"
 
-#define SPEECH_RUN_MIN_FRAMES   5
+#define SPEECH_RUN_MIN_FRAMES   4
 #define SILENCE_RUN_MIN_FRAMES  10
 
 #define FRAME_SIZE      0.01         // ms
 #define FFT_POINTS      NUMBER_OF_SAMPLES
-#define FFT_STEP        (SAMPLING_RATE/FFT_POINTS)
-#define NUM_OF_FRAMES   (FRAME_SIZE*SAMPLING_RATE) * 10000
+#define FFT_STEP        (SAMPLING_RATE / FFT_POINTS)
+// #define NUM_OF_FRAMES   (FRAME_SIZE * SAMPLING_RATE)
+#define NUM_OF_FRAMES   (FRAME_SIZE * SAMPLING_RATE)
 
 typedef enum {
     DECISION_SILENCE = 0,
@@ -25,8 +26,8 @@ typedef enum {
 
 /* local variables */
 typedef struct {
-    long double energy;
-    short F;
+    float energy;
+    float F;
     float SFM;
 } features;
 
@@ -80,7 +81,7 @@ void calculate_fft(short *real_buffer, cplx *fft_signal)
 
 float calculate_energy(short *signal)
 {
-    long double sum = 0;
+    float sum = 0;
 
     for (int i = 0; i < FFT_POINTS; i++) {
         sum += powl(signal[i], 2);
@@ -120,7 +121,7 @@ float calculate_dominant(cplx *spectrum)
         }
     }
 
-    return max_real >= max_imag ? i_real * FFT_STEP : i_imag * FFT_STEP;
+    return max_real > max_imag ? (float)(i_real * FFT_STEP) : (float)(i_imag * FFT_STEP);
 }
 
 float calculate_sfm(cplx *spectrum)
@@ -138,8 +139,7 @@ float calculate_sfm(cplx *spectrum)
     sum_ari = sum_ari / FFT_POINTS;
     sum_geo = expf(sum_geo / FFT_POINTS);
 
-    /* reversing with '-' */
-    return -10 * log10f(sum_geo / sum_ari);
+    return 10 * log10f(sum_geo / sum_ari);
 }
 
 void set_minimum_feature(features *minimum, features *current, int i)
@@ -160,14 +160,17 @@ int calculate_counter(features *minimum, features *current, features *threshold)
 {
     int counter = 0;
 
+    // printf("=======\r\n(current %f - minimum %f) = %f >= %f ? %d\r\n", current->energy, minimum->energy, current->energy - minimum->energy, threshold->energy, (current->energy - minimum->energy) >= threshold->energy);
     if ((current->energy - minimum->energy) >= threshold->energy) {
         counter++;
     }
 
+    // printf("(current %f - minimum %f) = %f >= %f ? %d\r\n", current->F, minimum->F, current->F - minimum->F, threshold->F, (current->F - minimum->F) >= threshold->F);
     if ((current->F - minimum->F) >= threshold->F) {
         counter++;
     }
 
+    // printf("(current %f - minimum %f) = %f >= %f ? %d\r\n\r\n", current->SFM, minimum->SFM, current->SFM - minimum->SFM, threshold->SFM, (current->SFM - minimum->SFM) >= threshold->SFM);
     if ((current->SFM - minimum->SFM) >= threshold->SFM) {
         counter++;
     }
@@ -192,10 +195,11 @@ int calculate_decision(vad *state, int counter)
         return DECISION_SILENCE;
     }
 
-    /* 5-0 ignore speech run if less than 5 frames */
+    /* 5-0 ignore speech run if less than 4 frames */
     if (state->speech_run > SPEECH_RUN_MIN_FRAMES)  {
         return DECISION_SPEECH;
     }
+
 
     /* return current state in case silence/speech run is not detected */
     return state->decision;
@@ -207,24 +211,27 @@ void *vad_moatt_thrd(void *args)
 
     int counter;
 
-    vad state;
-    features minimum;
-    features current;
-    features primary_threshold;
-    features current_threshold;
+    vad state = {};
+    features minimum = {};
+    features current = {};
+    features primary_threshold = {};
+    features current_threshold = {};
 
-    short real_signal[FFT_POINTS];
-    cplx fft_signal[FFT_POINTS];
+    short real_signal[FFT_POINTS] = {};
+    cplx fft_signal[FFT_POINTS] = {};
 
     /* based on Moatt */
     initialize_primary_thresholds(&primary_threshold);
 
     /* initial VAD decision */
     initialize_current_thresholds(&current_threshold, &primary_threshold); // moved from 3-4 for opt
+            int old_decision = DECISION_SILENCE;
 
-    printf("[VAD] starting thread loop");
+    printf("[VAD] starting thread loop\r\n");
     while (true) {
-        for (int i = 0; i < NUM_OF_FRAMES; i++) {
+        printf("new\r\n");
+        // for (int i = 0; i < NUM_OF_FRAMES; i++) {
+        for (int i = 0; i < 100; i++) {
             sem_wait(&attrs->raw_buffer_ready);
             // TODO is is safe? is it fast enough? maybe move/swap/anything
             memcpy(real_signal, attrs->raw_samples, sizeof(short) * FFT_POINTS);
@@ -244,7 +251,7 @@ void *vad_moatt_thrd(void *args)
             current_threshold.energy = primary_threshold.energy * log10f(minimum.energy);
 
             /* 3-5 calculate counter */
-            counter = calculate_counter(&current, &minimum, &current_threshold);
+            counter = calculate_counter(&minimum, &current, &current_threshold);
 
             /* 3-6, 4-0, 5-0: VAD */
             state.decision = calculate_decision(&state, counter);
@@ -253,7 +260,11 @@ void *vad_moatt_thrd(void *args)
             if (state.decision == DECISION_SILENCE) {
                 minimum.energy = ((state.silence_run * minimum.energy) + current.energy) / (state.silence_run + 1);
             }
-            current_threshold.energy = primary_threshold.energy * log10f(minimum.energy);
+
+            if (old_decision != state.decision) {
+                printf("change to %s\r\n", state.decision ? "speech" : "silence");
+                old_decision = state.decision;
+            }
         }
     }
 }

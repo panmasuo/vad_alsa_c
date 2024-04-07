@@ -15,7 +15,7 @@ Code is written in C language using:
 
 Make sure to install all needed dependencies:
 
-```
+```bash
 sudo apt install cmake ninja libasound2-dev
 ```
 

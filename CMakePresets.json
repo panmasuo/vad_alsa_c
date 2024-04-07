@@ -6,11 +6,5 @@
             "generator": "Ninja",
             "binaryDir": "${sourceDir}/build/release"
         }
-    ],
-    "buildPresets": [
-        {
-            "name": "VAD",
-            "configurePreset": "Release"
-        }
     ]
 }
