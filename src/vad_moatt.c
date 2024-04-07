@@ -233,7 +233,7 @@ void *vad_moatt_thrd(void *args)
             calculate_fft(real_signal, fft_signal);
 
             /* 3-1, 3-2 calculate features */
-            current.energy = calculate_energy(real_buffer);
+            current.energy = calculate_energy(real_signal);
             current.F = calculate_dominant(fft_signal);
             current.SFM = calculate_sfm(fft_signal);
 
@@ -247,7 +247,7 @@ void *vad_moatt_thrd(void *args)
             counter = calculate_counter(&current, &minimum, &current_threshold);
 
             /* 3-6, 4-0, 5-0: VAD */
-            state.decision = calculate_decision(counter);
+            state.decision = calculate_decision(&state, counter);
 
             /* 3-7, 3-8: update minimum energy */
             if (state.decision == DECISION_SILENCE) {

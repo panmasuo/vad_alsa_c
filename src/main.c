@@ -1,5 +1,6 @@
 #include <pthread.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 #include "config.h"
 #include "pcm_capture.h"
@@ -42,8 +43,8 @@ int main()
     pthread_create(&pcm_sampling_hndl, NULL, &pcm_sampling_thrd, (void *)&attrs);
     pthread_create(&vad_hndl, NULL, &vad_moatt_thrd, (void *)&attrs);
 
-    pthread_join(&pcm_sampling_hndl, NULL);
-    pthread_join(&vad_hndl, NULL);
+    pthread_join(pcm_sampling_hndl, NULL);
+    pthread_join(vad_hndl, NULL);
 
     return 0;
 }

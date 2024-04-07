@@ -26,13 +26,13 @@ void init_pcm_params(snd_pcm_t *pcm_hndl,
     /* in case of problem with hardware use this one "$ arecord -l" */
     // TODO configurable pcm source
     //      use "$ arecord -l" for device id
-    rc = snd_pcm_open(pcm_hndl, "default", SND_PCM_STREAM_CAPTURE, 0);
+    rc = snd_pcm_open(&pcm_hndl, "default", SND_PCM_STREAM_CAPTURE, 0);
     if (rc < 0) {
         fprintf(stderr, "snd_pcm_hw_params_any failed: %s\n", snd_strerror(rc));
         exit(1);
     }
 
-    snd_pcm_hw_params_alloca(pcm_params);
+    snd_pcm_hw_params_alloca(&pcm_params);
 
     rc = snd_pcm_hw_params_any(pcm_hndl, pcm_params);
     if (rc < 0) {

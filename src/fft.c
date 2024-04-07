@@ -1,6 +1,7 @@
 /* FFT calculation file */
 /* Source: https://rosettacode.org/wiki/Fast_Fourier_transform#C */
 #include <math.h>
+#include <stdio.h>
 
 #include "fft.h"
 

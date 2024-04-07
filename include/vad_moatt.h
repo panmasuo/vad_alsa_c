@@ -5,6 +5,6 @@
 
 typedef double complex cplx;
 
-void *vad_moatt_thrd();
+void *vad_moatt_thrd(void *args);
 
 #endif
