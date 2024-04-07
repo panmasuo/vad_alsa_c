@@ -5,9 +5,11 @@ Voice Activity Detection (VAD) algorithm made based on Moattar and Homayounpour'
 All of the code is written in C language. Using:
 1. ALSA (for sound proccesing)
 2. Pthreads (for multithreading)
-4. WiringPI (for led blinking on Raspberry Pi) <optional>
-  
+
 ## Building
+sudo apt-get install ninja-build
+Built and tested with `gcc-13` using `c23` standard.
+
 Make sure to install all needed dependencies:
 ```
 sudo apt-get install libasound2-dev 

@@ -18,7 +18,7 @@ void init_pcm_params(snd_pcm_t *pcm_hndl,
 {
     int rc;
     int dir;
-    snd_pcm_hw_params_t pcm_params;
+    snd_pcm_hw_params_t *pcm_params;
     unsigned int sampling_rate = SAMPLING_RATE;
 
     printf("[PCM] initializing...\r\n");
@@ -32,44 +32,44 @@ void init_pcm_params(snd_pcm_t *pcm_hndl,
         exit(1);
     }
 
-    snd_pcm_hw_params_alloca(&pcm_params);
+    snd_pcm_hw_params_alloca(pcm_params);
 
-    rc = snd_pcm_hw_params_any(pcm_hndl, &pcm_params);
+    rc = snd_pcm_hw_params_any(pcm_hndl, pcm_params);
     if (rc < 0) {
         fprintf(stderr, "snd_pcm_hw_params_any failed: %s\n", snd_strerror(rc));
         exit(1);
     }
 
-    rc = snd_pcm_hw_params_set_access(pcm_hndl, &pcm_params, SND_PCM_ACCESS_RW_INTERLEAVED);
+    rc = snd_pcm_hw_params_set_access(pcm_hndl, pcm_params, SND_PCM_ACCESS_RW_INTERLEAVED);
     if (rc < 0) {
         fprintf(stderr, "snd_pcm_hw_params_set_access failed: %s\n", snd_strerror(rc));
         exit(1);
     }
 
-    rc = snd_pcm_hw_params_set_format(pcm_hndl, &pcm_params, SND_PCM_FORMAT_S16_LE);
+    rc = snd_pcm_hw_params_set_format(pcm_hndl, pcm_params, SND_PCM_FORMAT_S16_LE);
     if (rc < 0) {
         fprintf(stderr, "snd_pcm_hw_params_set_format failed: %s\n", snd_strerror(rc));
         exit(1);
     }
 
-    rc = snd_pcm_hw_params_set_channels(pcm_hndl, &pcm_params, CHANNEL_COUNT);
+    rc = snd_pcm_hw_params_set_channels(pcm_hndl, pcm_params, CHANNEL_COUNT);
     if (rc < 0) {
         fprintf(stderr, "snd_pcm_hw_params_set_channels failed: %s\n", snd_strerror(rc));
         exit(1);
     }
 
-    rc = snd_pcm_hw_params_set_rate_near(pcm_hndl, &pcm_params, &sampling_rate, &dir);
+    rc = snd_pcm_hw_params_set_rate_near(pcm_hndl, pcm_params, &sampling_rate, &dir);
     if (SAMPLING_RATE != sampling_rate) {
         fprintf(stderr, "The rate %d Hz is not supported, using %d Hz instead\n", SAMPLING_RATE, sampling_rate);
     }
 
-    rc = snd_pcm_hw_params_set_period_size_near(pcm_hndl, &pcm_params, &pcm_frames, &dir);
+    rc = snd_pcm_hw_params_set_period_size_near(pcm_hndl, pcm_params, &pcm_frames, &dir);
     if (rc < 0) {
         fprintf(stderr, "snd_pcm_hw_params_set_period_size_near failed: %s\n", snd_strerror(rc));
         exit(1);
     }
 
-    rc = snd_pcm_hw_params(pcm_hndl, &pcm_params);
+    rc = snd_pcm_hw_params(pcm_hndl, pcm_params);
     if (rc < 0) {
         fprintf(stderr, "snd_pcm_hw_params failed: %s \n", snd_strerror(rc));
         exit(1);
@@ -102,10 +102,10 @@ void* pcm_sampling_thrd(void *args)
     int rc;
     struct application_attributes *attrs = args;
 
-    snd_pcm_t pcm_hndl;
+    snd_pcm_t *pcm_hndl = malloc(sizeof(snd_pcm_t*));
     snd_pcm_uframes_t pcm_frames = NUMBER_OF_SAMPLES;
 
-    init_pcm_params(&pcm_hndl, pcm_frames);
+    init_pcm_params(pcm_hndl, pcm_frames);
 
     printf("[PCM] starting thread loop");
     while (true) {

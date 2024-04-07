@@ -1,4 +1,5 @@
 #include <pthread.h>
+#include <stdio.h>
 
 #include "config.h"
 #include "pcm_capture.h"
@@ -12,13 +13,11 @@ static int init_mutexes(struct application_attributes* attrs);
 
 int init_mutexes(struct application_attributes* attrs)
 {
-    pthread_mutexattr_t signal_buffer_lock_attr;
-
     if (sem_init(&attrs->raw_buffer_ready, MAX_SEM_COUNT, INIT_DISABLE)) {
         return STATUS_FAILURE;
     }
 
-    if (sem_init(&attrs->raw_buffer_copied, MAX_SEM_COUNT, INIT_ENABLE) {
+    if (sem_init(&attrs->raw_buffer_copied, MAX_SEM_COUNT, INIT_ENABLE)) {
         return STATUS_FAILURE;
     }
 
