@@ -24,7 +24,7 @@ snd_pcm_t* init_pcm_params(snd_pcm_uframes_t pcm_frames)
     /* in case of problem with hardware use this one "$ arecord -l" */
     // TODO configurable pcm source
     //      use "$ arecord -l" for device id
-    rc = snd_pcm_open(&pcm_hndl, "hw:3", SND_PCM_STREAM_CAPTURE, 0);
+    rc = snd_pcm_open(&pcm_hndl, "default", SND_PCM_STREAM_CAPTURE, 0);
     if (rc < 0) {
         fprintf(stderr, "snd_pcm_hw_params_any failed: %s\n", snd_strerror(rc));
         exit(1);
@@ -72,13 +72,6 @@ snd_pcm_t* init_pcm_params(snd_pcm_uframes_t pcm_frames)
     }
 
     snd_pcm_hw_params_free(pcm_params);
-
-    // rc = snd_pcm_hw_params_set_period_size_near(pcm_hndl, pcm_params, &pcm_frames, &dir);
-    // if (rc < 0) {
-    //     fprintf(stderr, "snd_pcm_hw_params_set_period_size_near failed: %s\n", snd_strerror(rc));
-    //     exit(1);
-    // }
-
 
     printf("[PCM] initialized...\r\n");
     return pcm_hndl;

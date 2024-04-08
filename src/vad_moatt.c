@@ -139,7 +139,7 @@ float calculate_sfm(cplx *spectrum)
     sum_ari = sum_ari / FFT_POINTS;
     sum_geo = expf(sum_geo / FFT_POINTS);
 
-    return 10 * log10f(sum_geo / sum_ari);
+    return -10 * log10f(sum_geo / sum_ari);
 }
 
 void set_minimum_feature(features *minimum, features *current, int i)
@@ -160,17 +160,14 @@ int calculate_counter(features *minimum, features *current, features *threshold)
 {
     int counter = 0;
 
-    // printf("=======\r\n(current %f - minimum %f) = %f >= %f ? %d\r\n", current->energy, minimum->energy, current->energy - minimum->energy, threshold->energy, (current->energy - minimum->energy) >= threshold->energy);
     if ((current->energy - minimum->energy) >= threshold->energy) {
         counter++;
     }
 
-    // printf("(current %f - minimum %f) = %f >= %f ? %d\r\n", current->F, minimum->F, current->F - minimum->F, threshold->F, (current->F - minimum->F) >= threshold->F);
     if ((current->F - minimum->F) >= threshold->F) {
         counter++;
     }
 
-    // printf("(current %f - minimum %f) = %f >= %f ? %d\r\n\r\n", current->SFM, minimum->SFM, current->SFM - minimum->SFM, threshold->SFM, (current->SFM - minimum->SFM) >= threshold->SFM);
     if ((current->SFM - minimum->SFM) >= threshold->SFM) {
         counter++;
     }
@@ -225,13 +222,10 @@ void *vad_moatt_thrd(void *args)
 
     /* initial VAD decision */
     initialize_current_thresholds(&current_threshold, &primary_threshold); // moved from 3-4 for opt
-            int old_decision = DECISION_SILENCE;
 
     printf("[VAD] starting thread loop\r\n");
     while (true) {
-        printf("new\r\n");
-        // for (int i = 0; i < NUM_OF_FRAMES; i++) {
-        for (int i = 0; i < 100; i++) {
+        for (int i = 0; i < NUM_OF_FRAMES; i++) {
             sem_wait(&attrs->raw_buffer_ready);
             // TODO is is safe? is it fast enough? maybe move/swap/anything
             memcpy(real_signal, attrs->raw_samples, sizeof(short) * FFT_POINTS);
@@ -259,11 +253,6 @@ void *vad_moatt_thrd(void *args)
             /* 3-7, 3-8: update minimum energy */
             if (state.decision == DECISION_SILENCE) {
                 minimum.energy = ((state.silence_run * minimum.energy) + current.energy) / (state.silence_run + 1);
-            }
-
-            if (old_decision != state.decision) {
-                printf("change to %s\r\n", state.decision ? "speech" : "silence");
-                old_decision = state.decision;
             }
         }
     }

@@ -4,7 +4,7 @@
 
 #include <semaphore.h>
 
-#define NUMBER_OF_SAMPLES 256
+#define NUMBER_OF_SAMPLES 128
 #define SAMPLING_RATE     44100
 
 struct application_attributes {
